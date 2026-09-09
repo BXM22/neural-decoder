@@ -25,7 +25,7 @@ int main() {
     //   BIN_MS      = 10.0     // 100 Hz bin rate, typical for BCI decoders
     //   N_BINS      = 20000    // ~200 seconds of simulated data
 
-    // TODO(you): see README.md Step 4.
+    // TODO(you): see instructions.md Step 4.
     //
     //   1. Construct a NeuronPopulation and a PopulationVectorDecoder
     //      (pass the population's preferred directions into the decoder).
@@ -38,7 +38,7 @@ int main() {
     //
     //   3. Print population size, bin count, decode latency, VAF, and
     //      direction cosine similarity. There's a sample printf block
-    //      in the README under "What done looks like".
+    //      in instructions.md under "What done looks like".
 
     return 0;
 }
