@@ -10,17 +10,18 @@
 //
 // O(n_neurons) per bin, no matrix math, no training beyond knowing each
 // neuron's preferred direction - which is why it's still used as a
-// real-time baseline in real BCI systems. See README.md Step 2.
+// real-time baseline in real BCI systems. See README.md Step 3.
 class PopulationVectorDecoder {
 public:
     explicit PopulationVectorDecoder(std::vector<Vec2> preferred_directions)
         : pd_(std::move(preferred_directions)) {}
 
-    // TODO(you): implement below - see README.md Step 2.
+    // TODO(you): implement below - see README.md Step 3.
     Vec2 decode(const std::vector<int>& spike_counts) const {
         // Sum spike_counts[i] * pd_[i] over all neurons, then divide by
         // pd_.size() so the estimate's scale doesn't depend on population
         // size.
+        
         return Vec2{0.0, 0.0};
     }
 

@@ -10,8 +10,7 @@
 //
 // where PD_i is neuron i's preferred-direction vector (its gain and
 // direction of maximal modulation) and b0_i is its baseline rate.
-// Spikes within each bin are drawn from a Poisson process - see README.md
-// "Step 1" for the derivation and what to implement below.
+// Spikes within each bin are drawn from a Poisson process.
 class NeuronPopulation {
 public:
     NeuronPopulation(int n_neurons, double baseline_hz, double gain_hz_per_unit_speed,
@@ -23,7 +22,7 @@ public:
 
     // Draw a spike count per neuron for one time bin of length dt_s given
     // the true hand/cursor velocity during that bin.
-    // TODO(you): implement in simulator.cpp - see README.md Step 1.
+    // TODO(you): implement in simulator.cpp - see README.md Steps 1 and 2.
     std::vector<int> sampleSpikeCounts(const Vec2& velocity, double dt_s);
 
 private:

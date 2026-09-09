@@ -1,16 +1,15 @@
 # neural-decoder
 
-A bare-bones, from-scratch C++ project: simulate a population of motor-cortex
-neurons and decode their spikes into a velocity in real time. This is the
-core loop behind an intracortical BCI (like Neuralink's Telepathy product) -
-bin spikes, decode a command, hand it off - built here on synthetic data so
-you can learn the signal-processing fundamentals without needing real
+A from-scratch C++ project: simulate a population of motor-cortex neurons
+and decode their spikes into a velocity in real time. This is the core
+loop behind an intracortical BCI (like Neuralink's Telepathy product) -
+bin spikes, decode a command, hand it off - built here on synthetic data
+so you can learn the signal-processing fundamentals without needing real
 neural recordings.
 
-The project is a **scaffold, not a finished program.** The boilerplate
-(project structure, RNG setup, timing harness) is filled in; the three
-pieces that actually matter are left as `TODO(you)` blocks for you to
-implement. Do them in order - each one only needs what came before it.
+The folder structure, file names, and class/function signatures are in
+place so you have a compileable skeleton. **Every implementation is
+yours.** Do the steps in order - each one only needs what came before it.
 
 ## Why this project
 
@@ -26,26 +25,59 @@ in the hot path, etc.) that matter for the job.
 ## How the pieces fit together
 
 ```
-src/types.hpp      Vec2 - a tiny 2D vector type. Done, no TODOs.
-src/simulator.hpp  NeuronPopulation - declares the neuron model.
-src/simulator.cpp  NeuronPopulation::sampleSpikeCounts - TODO, Step 1.
-src/decoder.hpp    PopulationVectorDecoder::decode - TODO, Step 2.
-src/main.cpp       Real-time loop + accuracy metrics - TODO, Step 3.
+src/types.hpp      Vec2 - a tiny 2D vector type.          TODO, Step 0.
+src/simulator.hpp  NeuronPopulation - declares the model. Signatures only.
+src/simulator.cpp  Constructor + sampleSpikeCounts.       TODO, Steps 1-2.
+src/decoder.hpp    PopulationVectorDecoder::decode.       TODO, Step 3.
+src/main.cpp       Real-time loop + accuracy metrics.     TODO, Step 4.
+scripts/           Optional helpers (plots, etc.).
+results/           Optional output (metrics, figures).
 ```
 
 Build with `make`, run with `make run` (or `./neural_decoder` after
 building). The program currently compiles and runs with all TODOs stubbed
-out - it just reports zero/garbage accuracy until you fill them in. Use
-that as your checkpoint after each step.
+out - it just exits immediately until you fill them in. Use that as your
+checkpoint after each step.
 
 ---
 
-## Step 1: `simulator.cpp` - generate spikes from a velocity
+## Step 0: `types.hpp` - a 2D vector
 
-**Concept: cosine tuning.** Each neuron `i` has a "preferred direction"
-`PD_i` - a 2D vector already set up for you in the constructor, encoding
-both a direction and a gain (how strongly the neuron responds). A neuron's
-instantaneous firing rate given the true velocity `v(t)` is:
+You need addition, subtraction, scalar multiply, `+=`, Euclidean `norm()`,
+and a `dot()` product. These are the only operations the rest of the
+project uses.
+
+```
+(a + b).x = a.x + b.x          (same for y)
+(a * s).x = a.x * s
+a.dot(b)  = a.x * b.x + a.y * b.y
+a.norm()  = sqrt(a.x^2 + a.y^2)
+```
+
+Fill in the function bodies already declared on `Vec2` in `types.hpp`.
+
+---
+
+## Step 1: `simulator.cpp` - set up the neuron population
+
+Each neuron `i` has a "preferred direction" `PD_i` - a 2D vector encoding
+both a direction and a gain (how strongly the neuron responds). In the
+`NeuronPopulation` constructor, loop over `n_neurons` and for each one:
+
+1. Draw an angle `θ` uniformly from `[0, 2π)` using `rng_`.
+2. Store `PD_i = (cos θ, sin θ) * gain_hz_per_unit_speed` in `pd_`.
+3. Store `baseline_hz` in `baseline_`.
+
+`rng_` is already seeded from the constructor argument. Use
+`std::uniform_real_distribution<double>` for the angles. `reserve` on the
+vectors first if you want to avoid reallocations.
+
+---
+
+## Step 2: `simulator.cpp` - generate spikes from a velocity
+
+**Concept: cosine tuning.** A neuron's instantaneous firing rate given the
+true velocity `v(t)` is:
 
 ```
 rate_i(t) = max(0, baseline_i + PD_i . v(t))
@@ -72,9 +104,11 @@ Sanity check once done: print `sampleSpikeCounts` for a velocity aligned
 with a neuron's PD vs. opposite to it - the aligned neuron should fire much
 more.
 
-## Step 2: `decoder.hpp` - decode spikes back into a velocity
+---
 
-**Concept: population vector algorithm.** This is the reverse of Step 1.
+## Step 3: `decoder.hpp` - decode spikes back into a velocity
+
+**Concept: population vector algorithm.** This is the reverse of Step 2.
 If a neuron fired a lot, it's "voting" for its preferred direction. Add up
 every neuron's vote, weighted by how much it fired:
 
@@ -93,12 +127,29 @@ this works: replace it with a Kalman filter, which uses the same
 preferred-direction structure but models velocity as a smoothed,
 correlated-over-time process instead of decoding each bin independently.)
 
-## Step 3: `main.cpp` - measure decode quality and latency
+---
 
-The loop already generates a changing target direction, calls your
-simulator and decoder, and times the decode call in nanoseconds. What's
-missing is turning "true velocity vs. decoded velocity, 20,000 times" into
-two summary numbers:
+## Step 4: `main.cpp` - the real-time loop, quality, and latency
+
+Suggested constants (also listed as comments in `main.cpp`):
+
+```
+N_NEURONS   = 96
+BASELINE_HZ = 20.0
+GAIN        = 40.0      // Hz per unit speed at PD alignment
+BIN_MS      = 10.0      // 100 Hz bin rate
+N_BINS      = 20000     // ~200 seconds of simulated data
+```
+
+Construct a `NeuronPopulation` and a `PopulationVectorDecoder` (pass
+`pop.preferredDirections()` into the decoder). Then loop `N_BINS` times:
+
+1. Change the target reach direction every ~2 s (`t % 200 == 0` at 10 ms
+   bins) by sampling a new angle uniformly on `[0, 2π)`.
+2. Build the true velocity as `(cos θ, sin θ) * speed`.
+3. `auto spikes = pop.sampleSpikeCounts(true_v, dt_s);`
+4. Time `decoder.decode(spikes)` with `std::chrono::high_resolution_clock`.
+5. Accumulate running sums for the two accuracy metrics below.
 
 **VAF (variance accounted for)** - how much of the true velocity's
 variance your decoder captures. 1.0 is a perfect decoder, 0.0 is no better
@@ -115,16 +166,14 @@ direction with the true direction, ignoring magnitude:
 cosine_similarity = sum(true . decoded) / sqrt(sum(|true|^2) * sum(|decoded|^2))
 ```
 
-**Your task:** add running-sum accumulators before the loop, update them
-each iteration using `true_v` and `decoded_v`, then compute and print both
-metrics after the loop (there's a commented-out `printf` ready to
-uncomment).
+Print population size, bin count, decode latency (avg and max, in
+microseconds), VAF, and cosine similarity when the loop finishes.
 
 ---
 
 ## What "done" looks like
 
-With all three steps implemented, `make run` should print something like:
+With all steps implemented, `make run` should print something like:
 
 ```
 Neural population : 96 neurons, 20 Hz baseline, cosine velocity tuning
@@ -139,12 +188,13 @@ tuning drowned out by Poisson noise) - try raising it and see how the
 tradeoff between signal and noise plays out. That tradeoff is itself worth
 a sentence in your portfolio writeup.
 
-## Stretch goals (after Step 3 works)
+## Stretch goals (after Step 4 works)
 
 - **Kalman filter decoder.** Model velocity as a smoothed AR(1) process
   and fit an observation matrix from simulated data via least squares -
   the standard approach in real BCI decoding (Wu et al. 2006). Compare its
-  VAF and latency against the population vector decoder.
+  VAF and latency against the population vector decoder. Drop artifacts in
+  `results/`.
 - **Center-out task.** Instead of just measuring instantaneous velocity
   error, integrate decoded velocity into a cursor position and measure
   time-to-target across discrete reaches to 8 targets - the same paradigm
