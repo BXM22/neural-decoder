@@ -21,8 +21,7 @@ public:
     double gain() const { return gain_; }
     int size() const { return static_cast<int>(pd_.size()); }
 
-    // Draw a spike count per neuron for one time bin of length dt_s given
-    // the true hand/cursor velocity during that bin.
+   
     std::vector<int> sampleSpikeCounts(const Vec2& velocity, double dt_s);
 
 private:
