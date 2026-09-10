@@ -29,8 +29,8 @@ make run      # compile if needed, then run
 make clean    # remove the binary
 ```
 
-The program compiles with remaining TODOs stubbed out. Until you finish
-Steps 3 and 4 it exits immediately with no metrics.
+`make run` prints population size, bin rate, decode latency, VAF, and
+direction cosine similarity.
 
 ## Layout
 
@@ -54,3 +54,35 @@ Each neuron has a unit preferred direction. Its rate in a bin is
 `max(0, baseline + gain * (PD · v))`; spike counts are Poisson with mean
 `rate * dt`. The decoder is the reverse: a weighted sum of those preferred
 directions, scaled by a closed-form calibration constant.
+
+## Possible updates
+
+The population vector decoder is the right first algorithm, not the last
+one. These are natural next steps, ordered roughly from smallest change
+to “this is a second project.” Drop comparison artifacts in `results/`.
+
+- **Kalman filter decoder.** Model velocity as a smoothed AR(1) process
+  and fit an observation matrix from simulated data (Wu et al. 2006).
+  Compare VAF and latency against the population vector. This is the
+  standard real-time BCI baseline; the population vector treats each bin
+  independently, so it cannot use the fact that the hand does not jump.
+- **Estimate preferred directions from data.** The current decoder is
+  handed oracle PDs from the simulator. Fit them from `(spikes, velocity)`
+  pairs instead — cosine-tuning regression per neuron — then decode with
+  the fitted PDs. That is closer to what you do with a real array.
+- **Center-out task.** Integrate decoded velocity into a cursor position
+  and measure time-to-target on reaches to 8 targets. Instantaneous VAF
+  is a decoder metric; time-to-target is the task metric BCI papers report.
+- **No allocations in the hot path.** `sampleSpikeCounts` currently
+  returns a new `std::vector<int>` every bin. Fill a preallocated buffer
+  instead so decode latency is not mixed with heap traffic.
+- **Sweep gain, bin size, and population size.** Plot VAF and cosine
+  similarity vs. `N_NEURONS`, `GAIN`, and `BIN_MS`. That makes the
+  signal-vs-Poisson-noise tradeoff visible instead of a single lucky run.
+- **Dropped channels / nonstationarity.** Zero out a fraction of neurons
+  mid-session, or slowly rotate PDs, and show how VAF falls. Real arrays
+  lose units; a decoder that only works on a stationary oracle population
+  is not yet a decoder you would ship.
+- **Real recordings.** Public reaching-task datasets (e.g. Stanford NPTL)
+  let you run the same decoder on real spikes instead of cosine-tuned
+  Poisson neurons. Expect VAF to drop; that gap is the interesting result.
